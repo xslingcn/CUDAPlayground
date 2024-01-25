@@ -5,6 +5,10 @@ int n = 0x7fffffff >> 2;
 
 __global__ void mykernal(int *d_a, int *d_b, int *d_c, int n)
 {
+    uint3 threidId = threadIdx;
+    uint3 blockId = blockIdx;
+    dim3 blockDimId = blockDim;
+    
     int i = threadIdx.x + blockIdx.x * blockDim.x;
     if (i < n)
     {
@@ -14,8 +18,11 @@ __global__ void mykernal(int *d_a, int *d_b, int *d_c, int n)
 
 void addWithCuda (int *d_a, int *d_b, int *d_c){
     // mykernal<<<ceil(n / 512.0), 512>>>(d_a, d_b, d_c, n);
-    mykernal<<<ceil(n/256.0), 256>>>(d_a, d_b, d_c, n);
+    // mykernal<<<ceil(n/256.0), 256>>>(d_a, d_b, d_c, n);
     // mykernal<<<1, 1>>>(d_a, d_b, d_c, n);
+    dim3 threadsPerBlock(256, 256);
+    dim3 numBlocks(ceil(n / 256.0), ceil(n / 256.0));
+    mykernal<<<numBlocks, threadsPerBlock>>>(d_a, d_b, d_c, n);
 
     int *h_c;
     h_c = (int *)malloc(n*sizeof(int));
