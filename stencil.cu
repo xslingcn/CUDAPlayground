@@ -47,16 +47,48 @@ __global__ void simple_conv_2d(float *N, float *M, float *P, int width, int heig
     P[row * width + col] = pValue;
 }
 
+#define TILE_SIZE 1020
 __global__ void tiled_conv_1d(float *N, float *M, float *P, int size, int kernelSize)
 {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int tx = threadIdx.x;
+
+    __shared__ float Ns[TILE_SIZE + 4];
+
+    int nStart = blockIdx.x * blockDim.x - kernelSize / 2; // index_o - n, n=kernelSize/2
+    if (nStart + tx >= 0 && nStart + tx < size)
+    {
+        Ns[tx] = N[nStart + tx];
+    }
+    else
+    {
+        Ns[tx] = 0.0f;
+    }
+    __syncthreads();
+
+    float pValue = 0;
+    if (i < size)
+    {
+        for (int j = 0; j < kernelSize; j++)
+        {
+            pValue += Ns[tx + j] * M[j];
+        }
+        P[i] = pValue;
+    }
 }
 
 void test_simple_conv_1d()
 {
-    int size = 7;
+    // int size = 7;
+    int size = 5000;
     int kernelSize = 5;
 
-    float h_N[size] = {1, 2, 3, 4, 5, 6, 7};
+    // float h_N[size] = {1, 2, 3, 4, 5, 6, 7};
+    float h_N[size];
+    for (int i = 0; i < size; i++)
+    {
+        h_N[i] = static_cast<float>(i);
+    }
     float h_M[kernelSize] = {3, 4, 5, 4, 3};
     float h_P[size];
 
@@ -123,6 +155,45 @@ void test_simple_conv_2d()
     cudaFree(d_P);
 }
 
+void test_tiled_conv_1d (){
+    int size = 5000;
+    int kernelSize = 5;
+    float h_N[size];
+    float h_M[kernelSize] = {3, 4, 5, 4, 3};
+    float h_P[size];
+
+    for (int i = 0; i < size; i++)
+    {
+        h_N[i] = static_cast<float>(i);
+    }
+
+    float *d_N, *d_M, *d_P;
+
+    cudaMalloc((void **)&d_N, size * sizeof(float));
+    cudaMalloc((void **)&d_M, kernelSize * sizeof(float));
+    cudaMalloc((void **)&d_P, size * sizeof(float));
+
+    cudaMemcpy(d_N, h_N, size * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_M, h_M, kernelSize * sizeof(float), cudaMemcpyHostToDevice);
+
+    dim3 threadsPerBlock(TILE_SIZE + 4, 1, 1);
+    dim3 numBlocks(ceil(size / TILE_SIZE), 1, 1);
+
+    tiled_conv_1d<<<threadsPerBlock, numBlocks>>>(d_N, d_M, d_P, size, kernelSize);
+
+    cudaMemcpy(h_P, d_P, size * sizeof(float), cudaMemcpyDeviceToHost);
+
+    for (int i = 0; i < size; i++)
+    {
+        printf("%f ", h_P[i]);
+    }
+    printf("\n");
+
+    cudaFree(d_N);
+    cudaFree(d_M);
+    cudaFree(d_P);
+}
+
 int main()
 {
     auto start = std::chrono::high_resolution_clock::now();
@@ -136,4 +207,10 @@ int main()
     end = std::chrono::high_resolution_clock::now();
     diff = end - start;
     printf("simple_conv_2d: %f\n", diff.count());
+
+    start = std::chrono::high_resolution_clock::now();
+    test_tiled_conv_1d();
+    end = std::chrono::high_resolution_clock::now();
+    diff = end - start;
+    printf("tiled_conv_1d: %f\n", diff.count());
 }
