@@ -1,6 +1,8 @@
 #include <cstdio>
 #include <chrono>
 
+// https://imgur.com/a/juCkz2a
+
 __global__ void plain_conv_1d(float *N, float *M, float *P, int size, int kernelSize)
 {
     int i = blockIdx.x * blockDim.x + threadIdx.x;

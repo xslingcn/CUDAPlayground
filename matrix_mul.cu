@@ -133,8 +133,8 @@ int main()
     float *P = new float[width * width]();
     for (int i = 0; i < width * width; i++)
     {
-        M[i] = 1.0f * i;
-        N[i] = 2.0f * i;
+        M[i] = rand() % 100;
+        N[i] = rand() % 100;
     }
 
     auto start = std::chrono::high_resolution_clock::now();
